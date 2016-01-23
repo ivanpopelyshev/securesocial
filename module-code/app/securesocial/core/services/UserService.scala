@@ -47,7 +47,7 @@ trait UserService[U] {
    * @param profile the user profile
    * @param mode a mode that tells you why the save method was called
    */
-  def save(profile: BasicProfile, mode: SaveMode): Future[U]
+  def save(profile: BasicProfile, mode: SaveMode, session: Map[String, String]): Future[U]
 
   /**
    * Links the current user to another profile

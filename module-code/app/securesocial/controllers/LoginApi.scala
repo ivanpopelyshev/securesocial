@@ -50,6 +50,8 @@ trait BaseLoginApi extends SecureSocial {
   val logger = play.api.Logger("securesocial.controllers.BaseLoginApi")
 
   def authenticate(providerId: String, builderId: String) = Action.async { implicit request =>
+    import ExecutionContext.Implicits.global
+    implicit val requestInfo = env.authRouter.getAll(request)
     val result = for (
       builder <- env.authenticatorService.find(builderId);
       provider <- env.providers.get(providerId) if provider.isInstanceOf[ApiSupport]
@@ -57,16 +59,16 @@ trait BaseLoginApi extends SecureSocial {
       provider.asInstanceOf[ApiSupport].authenticateForApi.flatMap {
         case authenticated: Authenticated =>
           val profile = authenticated.profile
-          env.userService.find(profile.providerId, profile.userId).flatMap {
+          env.userService.find(profile.providerId, profile.pid).flatMap {
             maybeExisting =>
               val mode = if (maybeExisting.isDefined) SaveMode.LoggedIn else SaveMode.SignUp
-              env.userService.save(authenticated.profile, mode).flatMap {
+              env.userService.save(authenticated.profile, mode, request.session.data).flatMap {
                 userForAction =>
-                  logger.debug(s"[securesocial] user completed authentication: provider = ${profile.providerId}, userId: ${profile.userId}, mode = $mode")
+                  logger.debug(s"[securesocial] user completed authentication: provider = ${profile.providerId}, userId: ${profile.pid}, mode = $mode")
                   val evt = if (mode == SaveMode.LoggedIn) new LoginEvent(userForAction) else new SignUpEvent(userForAction)
                   // we're not using a session here .... review this.
                   Events.fire(evt)
-                  builder.fromUser(userForAction).map { authenticator =>
+                  builder.fromUser(userForAction, requestInfo).map { authenticator =>
                     val token = TokenResponse(authenticator.id, authenticator.expirationDate)
                     Ok(Json.toJson(token))
                   }
@@ -85,8 +87,9 @@ trait BaseLoginApi extends SecureSocial {
 
   def logout = Action.async { implicit request =>
     import securesocial.core.utils._
-
-    env.authenticatorService.fromRequest(request).flatMap {
+    import ExecutionContext.Implicits.global
+    implicit val requestInfo = env.authRouter.getAll(request)
+    env.authenticatorService.fromRequest(request, requestInfo).flatMap {
       case Some(authenticator) => Ok("").discardingAuthenticator(authenticator)
       case None => Future.successful(Ok(""))
     }

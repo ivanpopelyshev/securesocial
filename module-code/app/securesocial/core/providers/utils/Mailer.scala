@@ -47,7 +47,8 @@ object Mailer {
    */
   class Default(mailTemplates: MailTemplates) extends Mailer {
     private val logger = play.api.Logger("securesocial.core.providers.utils.Mailer.Default")
-    val fromAddress = current.configuration.getString("play.mailer.from").get
+    val fromAddress = current.configuration.getString("smtp.from").get
+//    val fromAddress = current.configuration.getString("play.mailer.from").get
     val AlreadyRegisteredSubject = "mails.sendAlreadyRegisteredEmail.subject"
     val SignUpEmailSubject = "mails.sendSignUpEmail.subject"
     val WelcomeEmailSubject = "mails.welcomeEmail.subject"

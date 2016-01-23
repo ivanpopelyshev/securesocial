@@ -41,9 +41,10 @@ import play.api.Play
 case class CookieAuthenticator[U](id: String, user: U, expirationDate: DateTime,
   lastUsed: DateTime,
   creationDate: DateTime,
-  @transient store: AuthenticatorStore[CookieAuthenticator[U]])
+  @transient store: AuthenticatorStore[CookieAuthenticator[U]],
+  requestInfo: RouterInfo)
     extends StoreBackedAuthenticator[U, CookieAuthenticator[U]] {
-
+   
   @transient
   override val idleTimeoutInMinutes = CookieAuthenticator.idleTimeout
 
@@ -73,10 +74,14 @@ case class CookieAuthenticator[U](id: String, user: U, expirationDate: DateTime,
    * @param result the result that is about to be sent to the client.
    * @return the result modified to signal the authenticator is no longer valid
    */
-  override def discarding(result: Result): Future[Result] = {
+  override def discarding(result: Result)(implicit requestInfo: RouterInfo): Future[Result] = {
     store.delete(id).map { _ =>
-      result.discardingCookies(CookieAuthenticator.discardingCookie)
+      result.discardingCookies(CookieAuthenticator.discardingCookie2(requestInfo.authPrefix))
     }
+  }
+  
+  override def touching(result: Result)(implicit requestInfo: RouterInfo): Future[Result] = {
+    Future.successful(result)
   }
 
   /**
@@ -85,11 +90,11 @@ case class CookieAuthenticator[U](id: String, user: U, expirationDate: DateTime,
    * @param result the result that is about to be sent to the client
    * @return the result with the authenticator cookie set
    */
-  override def starting(result: Result): Future[Result] = {
+  override def starting(result: Result)(implicit requestInfo: RouterInfo): Future[Result] = {
     Future.successful {
       result.withCookies(
         Cookie(
-          CookieAuthenticator.cookieName,
+          requestInfo.authPrefix + CookieAuthenticator.cookieName,
           id,
           if (CookieAuthenticator.makeTransient)
             CookieAuthenticator.Transient
@@ -137,8 +142,8 @@ class CookieAuthenticatorBuilder[U](store: AuthenticatorStore[CookieAuthenticato
    * @param request the incoming request
    * @return an optional CookieAuthenticator instance.
    */
-  override def fromRequest(request: RequestHeader): Future[Option[CookieAuthenticator[U]]] = {
-    request.cookies.get(CookieAuthenticator.cookieName) match {
+  override def fromRequest(request: RequestHeader, requestInfo: RouterInfo): Future[Option[CookieAuthenticator[U]]] = {
+    request.cookies.get(requestInfo.authPrefix + CookieAuthenticator.cookieName) match {
       case Some(cookie) => store.find(cookie.value).map { retrieved =>
         retrieved.map { _.copy(store = store) }
       }
@@ -152,12 +157,12 @@ class CookieAuthenticatorBuilder[U](store: AuthenticatorStore[CookieAuthenticato
    * @param user the user
    * @return a CookieAuthenticator instance.
    */
-  override def fromUser(user: U): Future[CookieAuthenticator[U]] = {
+  override def fromUser(user: U, requestInfo: RouterInfo): Future[CookieAuthenticator[U]] = {
     generator.generate.flatMap {
       id =>
         val now = DateTime.now()
         val expirationDate = now.plusMinutes(CookieAuthenticator.absoluteTimeout)
-        val authenticator = CookieAuthenticator(id, user, expirationDate, now, now, store)
+        val authenticator = CookieAuthenticator(id, user, expirationDate, now, now, store, requestInfo)
         store.save(authenticator, CookieAuthenticator.absoluteTimeoutInSeconds)
     }
   }
@@ -201,5 +206,16 @@ object CookieAuthenticator {
 
   val discardingCookie: DiscardingCookie = {
     DiscardingCookie(cookieName, cookiePath, cookieDomain, cookieSecure)
+  }
+  
+  def discardingCookie2(prefix: String) = {
+    DiscardingCookie(prefix + cookieName, cookiePath, cookieDomain, cookieSecure)
+  }
+  
+  def fromExistingUserSession[U](store: AuthenticatorStore[CookieAuthenticator[U]], id: String, user: U, requestInfo: RouterInfo): CookieAuthenticator[U] = {
+    import ExecutionContext.Implicits.global
+    val now = DateTime.now()
+    val expirationDate = now.plusMinutes(CookieAuthenticator.absoluteTimeout)
+    CookieAuthenticator(id, user, expirationDate, now, now, store, requestInfo)
   }
 }

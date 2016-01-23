@@ -68,8 +68,16 @@ case class HttpHeaderAuthenticator[U](id: String, user: U, expirationDate: DateT
    * @param result the result that is about to be sent to the client
    * @return the result with the authenticator header set
    */
-  override def starting(result: Result): Future[Result] = {
+  override def starting(result: Result)(implicit requestInfo: RouterInfo): Future[Result] = {
     Future.successful { result }
+  }
+  
+  override def touching(result: Result)(implicit requestInfo: RouterInfo): Future[Result] = {
+    Future.successful(result)
+  }
+  
+  override def discarding(result: Result)(implicit requestInfo: RouterInfo): Future[Result] = {
+    Future.successful(result)
   }
 }
 
@@ -93,7 +101,7 @@ class HttpHeaderAuthenticatorBuilder[U](store: AuthenticatorStore[HttpHeaderAuth
    * @param request the incoming request
    * @return an optional HttpHeaderAuthenticator instance.
    */
-  override def fromRequest(request: RequestHeader): Future[Option[HttpHeaderAuthenticator[U]]] = {
+  override def fromRequest(request: RequestHeader, info: RouterInfo): Future[Option[HttpHeaderAuthenticator[U]]] = {
     request.headers.get(HttpHeaderAuthenticator.headerName) match {
       case Some(value) => store.find(value).map { retrieved =>
         retrieved.map { _.copy(store = store) }
@@ -108,7 +116,7 @@ class HttpHeaderAuthenticatorBuilder[U](store: AuthenticatorStore[HttpHeaderAuth
    * @param user the user
    * @return a HttpHeaderAuthenticator instance.
    */
-  override def fromUser(user: U): Future[HttpHeaderAuthenticator[U]] = {
+  override def fromUser(user: U, info: RouterInfo): Future[HttpHeaderAuthenticator[U]] = {
     generator.generate.flatMap {
       id =>
         val now = DateTime.now()

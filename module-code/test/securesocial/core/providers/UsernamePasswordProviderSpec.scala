@@ -77,7 +77,7 @@ class UsernamePasswordProviderSpec extends PlaySpecification with Mockito {
 
     def basicProfileFor(user: User) = BasicProfile(
       providerId = upp.id,
-      userId = user.email,
+      pid = user.email,
       firstName = None,
       lastName = None,
       fullName = None,

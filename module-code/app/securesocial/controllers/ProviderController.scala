@@ -106,17 +106,17 @@ trait BaseProviderController extends SecureSocial {
         case authenticated: AuthenticationResult.Authenticated =>
           if (authenticationFlow) {
             val profile = authenticated.profile
-            env.userService.find(profile.providerId, profile.userId).flatMap { maybeExisting =>
+            env.userService.find(profile.providerId, profile.pid).flatMap { maybeExisting =>
               val mode = if (maybeExisting.isDefined) SaveMode.LoggedIn else SaveMode.SignUp
-              env.userService.save(authenticated.profile, mode).flatMap { userForAction =>
-                logger.debug(s"[securesocial] user completed authentication: provider = ${profile.providerId}, userId: ${profile.userId}, mode = $mode")
+              env.userService.save(authenticated.profile, mode, request.session.data).flatMap { userForAction =>
+                logger.debug(s"[securesocial] user completed authentication: provider = ${profile.providerId}, userId: ${profile.pid}, mode = $mode")
                 val evt = if (mode == SaveMode.LoggedIn) new LoginEvent(userForAction) else new SignUpEvent(userForAction)
                 val sessionAfterEvents = Events.fire(evt).getOrElse(request.session)
-                builder().fromUser(userForAction).flatMap { authenticator =>
+                builder().fromUser(userForAction, request.requestInfo).flatMap { authenticator =>
                   Redirect(toUrl(sessionAfterEvents)).withSession(sessionAfterEvents -
                     SecureSocial.OriginalUrlKey -
                     IdentityProvider.SessionId -
-                    OAuth1Provider.CacheKey).startingAuthenticator(authenticator)
+                    OAuth1Provider.CacheKey).startingAuthenticator(authenticator)(request.requestInfo)
                 }
               }
             }
@@ -129,7 +129,7 @@ trait BaseProviderController extends SecureSocial {
                   result <- Redirect(toUrl(modifiedSession)).withSession(modifiedSession -
                     SecureSocial.OriginalUrlKey -
                     IdentityProvider.SessionId -
-                    OAuth1Provider.CacheKey).touchingAuthenticator(updatedAuthenticator)
+                    OAuth1Provider.CacheKey).touchingAuthenticator(updatedAuthenticator)(request.requestInfo)
                 ) yield {
                   logger.debug(s"[securesocial] linked $currentUser to: providerId = ${authenticated.profile.providerId}")
                   result

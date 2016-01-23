@@ -156,6 +156,7 @@ trait BaseRegistration extends MailTokenBasedOperations {
   def handleSignUp(token: String) = CSRFCheck {
     Action.async {
       implicit request =>
+        implicit val requestInfo = env.authRouter.getAll(request)
         executeForToken(token, true, {
           t =>
             form.bindFromRequest.fold(
@@ -186,7 +187,7 @@ trait BaseRegistration extends MailTokenBasedOperations {
                 import securesocial.core.utils._
                 val result = for (
                   toSave <- withAvatar;
-                  saved <- env.userService.save(toSave, SaveMode.SignUp);
+                  saved <- env.userService.save(toSave, SaveMode.SignUp, request.session.data);
                   deleted <- env.userService.deleteToken(t.uuid)
                 ) yield {
                   if (UsernamePasswordProvider.sendWelcomeEmail)
@@ -194,7 +195,7 @@ trait BaseRegistration extends MailTokenBasedOperations {
                   val eventSession = Events.fire(new SignUpEvent(saved)).getOrElse(request.session)
                   if (UsernamePasswordProvider.signupSkipLogin) {
                     env.authenticatorService.find(CookieAuthenticator.Id).map {
-                      _.fromUser(saved).flatMap { authenticator =>
+                      _.fromUser(saved, requestInfo).flatMap { authenticator =>
                         confirmationResult()
                           .flashing(Success -> Messages(SignUpDone))
                           .withSession(eventSession - SecureSocial.OriginalUrlKey - IdentityProvider.SessionId)

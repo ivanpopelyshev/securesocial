@@ -42,7 +42,7 @@ class TestUserService extends UserService[DemoUser] {
     }
     val result = for (
       user <- users.values;
-      basicProfile <- user.identities.find(su => su.providerId == providerId && su.userId == userId)
+      basicProfile <- user.identities.find(su => su.providerId == providerId && su.pid == userId)
     ) yield {
       basicProfile
     }
@@ -63,41 +63,41 @@ class TestUserService extends UserService[DemoUser] {
     Future.successful(result.headOption)
   }
 
-  def save(user: BasicProfile, mode: SaveMode): Future[DemoUser] = {
+  def save(user: BasicProfile, mode: SaveMode, session: Map[String, String]): Future[DemoUser] = {
     mode match {
       case SaveMode.SignUp =>
         val newUser = DemoUser(user, List(user))
-        users = users + ((user.providerId, user.userId) -> newUser)
+        users = users + ((user.providerId, user.pid) -> newUser)
       case SaveMode.LoggedIn =>
 
     }
     // first see if there is a user with this BasicProfile already.
     val maybeUser = users.find {
-      case (key, value) if value.identities.exists(su => su.providerId == user.providerId && su.userId == user.userId) => true
+      case (key, value) if value.identities.exists(su => su.providerId == user.providerId && su.pid == user.pid) => true
       case _ => false
     }
     maybeUser match {
       case Some(existingUser) =>
         val identities = existingUser._2.identities
-        val updatedList = identities.patch(identities.indexWhere(i => i.providerId == user.providerId && i.userId == user.userId), Seq(user), 1)
+        val updatedList = identities.patch(identities.indexWhere(i => i.providerId == user.providerId && i.pid == user.pid), Seq(user), 1)
         val updatedUser = existingUser._2.copy(identities = updatedList)
         users = users + (existingUser._1 -> updatedUser)
         Future.successful(updatedUser)
 
       case None =>
         val newUser = DemoUser(user, List(user))
-        users = users + ((user.providerId, user.userId) -> newUser)
+        users = users + ((user.providerId, user.pid) -> newUser)
         Future.successful(newUser)
     }
   }
 
   def link(current: DemoUser, to: BasicProfile): Future[DemoUser] = {
-    if (current.identities.exists(i => i.providerId == to.providerId && i.userId == to.userId)) {
+    if (current.identities.exists(i => i.providerId == to.providerId && i.pid == to.pid)) {
       Future.successful(current)
     } else {
       val added = to :: current.identities
       val updatedUser = current.copy(identities = added)
-      users = users + ((current.main.providerId, current.main.userId) -> updatedUser)
+      users = users + ((current.main.providerId, current.main.pid) -> updatedUser)
       Future.successful(updatedUser)
     }
   }

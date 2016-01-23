@@ -40,6 +40,8 @@ trait RuntimeEnvironment {
   def eventListeners: Seq[EventListener]
 
   def userService: UserService[U]
+  
+  def authRouter : AuthRouter
 
   implicit def executionContext: ExecutionContext
 }
@@ -72,6 +74,7 @@ object RuntimeEnvironment {
     )
 
     override lazy val eventListeners: Seq[EventListener] = Seq()
+    override lazy val authRouter: AuthRouter = new AuthRouter.Default()
     override implicit def executionContext: ExecutionContext =
       PlayExecution.defaultContext
 

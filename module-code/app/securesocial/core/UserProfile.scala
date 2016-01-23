@@ -21,7 +21,7 @@ package securesocial.core
  */
 trait UserProfile {
   def providerId: String
-  def userId: String
+  def pid: String
 }
 
 /**
@@ -44,16 +44,17 @@ trait GenericProfile extends UserProfile {
  */
 case class BasicProfile(
   providerId: String,
-  userId: String,
+  pid: String,
   firstName: Option[String],
   lastName: Option[String],
   fullName: Option[String],
   email: Option[String],
   avatarUrl: Option[String],
-  authMethod: AuthenticationMethod,
+  authMethod: AuthenticationMethod = AuthenticationMethod.UserPassword,
   oAuth1Info: Option[OAuth1Info] = None,
   oAuth2Info: Option[OAuth2Info] = None,
-  passwordInfo: Option[PasswordInfo] = None) extends GenericProfile
+  passwordInfo: Option[PasswordInfo] = None,
+  nickname: Option[String] = None) extends GenericProfile
 
 /**
  * The OAuth 1 details

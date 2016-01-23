@@ -84,7 +84,7 @@ trait BaseLoginPage extends SecureSocial {
         user <- request.user
         authenticator <- request.authenticator
       } yield {
-        redirectTo.discardingAuthenticator(authenticator).map {
+        redirectTo.discardingAuthenticator(authenticator)(request.requestInfo).map {
           _.withSession(Events.fire(new LogoutEvent(user)).getOrElse(request.session))
         }
       }

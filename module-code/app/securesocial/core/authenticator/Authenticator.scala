@@ -82,7 +82,7 @@ trait Authenticator[U] {
    * @param result the result that is about to be sent to the client
    * @return the result modified to signal a new session has been created.
    */
-  def starting(result: Result): Future[Result]
+  def starting(result: Result)(implicit requestInfo: RouterInfo): Future[Result]
 
   /**
    * Ends an authenticator session.  This is invoked when the user logs out or if the
@@ -91,7 +91,7 @@ trait Authenticator[U] {
    * @param result the result that is about to be sent to the client.
    * @return the result modified to signal the authenticator is no longer valid
    */
-  def discarding(result: Result): Future[Result]
+  def discarding(result: Result)(implicit requestInfo: RouterInfo): Future[Result]
 
   /**
    * Invoked after a protected action is executed.  This can be used to
@@ -101,7 +101,7 @@ trait Authenticator[U] {
    * @param result the result that is about to be sent to the client.
    * @return the result modified with the updated authenticator
    */
-  def touching(result: Result): Future[Result]
+  def touching(result: Result)(implicit requestInfo: RouterInfo): Future[Result]
 
   // java results
   /**
@@ -138,7 +138,7 @@ trait AuthenticatorBuilder[U] {
    * @param request the incoming request
    * @return an instance of an authenticator if the user is authenticated or None otherwise.
    */
-  def fromRequest(request: RequestHeader): Future[Option[Authenticator[U]]]
+  def fromRequest(request: RequestHeader, requestInfo: RouterInfo): Future[Option[Authenticator[U]]]
 
   /**
    * Creates an authenticator for the given user
@@ -146,5 +146,5 @@ trait AuthenticatorBuilder[U] {
    * @param user the user object
    * @return an Authenticator associated with the user
    */
-  def fromUser(user: U): Future[Authenticator[U]]
+  def fromUser(user: U, requestInfo: RouterInfo): Future[Authenticator[U]]
 }

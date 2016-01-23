@@ -95,12 +95,14 @@ trait SecureSocial extends Controller {
     def invokeSecuredBlock[A](authorize: Option[Authorization[env.U]], request: Request[A],
       block: SecuredRequest[A, env.U] => Future[Result]): Future[Result] =
       {
-        env.authenticatorService.fromRequest(request).flatMap {
+        import ExecutionContext.Implicits.global
+        implicit val requestInfo = env.authRouter.getAll(request)
+        env.authenticatorService.fromRequest(request, requestInfo).flatMap {
           case Some(authenticator) if authenticator.isValid =>
             authenticator.touch.flatMap { updatedAuthenticator =>
               val user = updatedAuthenticator.user
               if (authorize.isEmpty || authorize.get.isAuthorized(user, request)) {
-                block(SecuredRequest(user, updatedAuthenticator, request)).flatMap {
+                block(SecuredRequest(user, updatedAuthenticator, request, requestInfo)).flatMap {
                   _.touchingAuthenticator(updatedAuthenticator)
                 }
               } else {
@@ -139,15 +141,17 @@ trait SecureSocial extends Controller {
     override def invokeBlock[A](request: Request[A],
       block: (RequestWithUser[A, env.U]) => Future[Result]): Future[Result] =
       {
-        env.authenticatorService.fromRequest(request).flatMap {
+        import ExecutionContext.Implicits.global
+        implicit val requestInfo = env.authRouter.getAll(request)
+        env.authenticatorService.fromRequest(request, requestInfo).flatMap {
           case Some(authenticator) if authenticator.isValid =>
             authenticator.touch.flatMap {
-              a => block(RequestWithUser(Some(a.user), Some(a), request))
+              a => block(RequestWithUser(Some(a.user), Some(a), request, requestInfo))
             }
           case Some(authenticator) if !authenticator.isValid =>
-            block(RequestWithUser(None, None, request)).flatMap(_.discardingAuthenticator(authenticator))
+            block(RequestWithUser(None, None, request, requestInfo)).flatMap(_.discardingAuthenticator(authenticator))
           case None =>
-            block(RequestWithUser(None, None, request))
+            block(RequestWithUser(None, None, request, requestInfo))
         }
       }
   }
@@ -159,12 +163,12 @@ object SecureSocial {
   /**
    * A request that adds the User for the current call
    */
-  case class SecuredRequest[A, U](user: U, authenticator: Authenticator[U], request: Request[A]) extends WrappedRequest(request)
+  case class SecuredRequest[A, U](user: U, authenticator: Authenticator[U], request: Request[A], requestInfo: RouterInfo) extends WrappedRequest(request)
 
   /**
    * A request that adds the User for the current call
    */
-  case class RequestWithUser[A, U](user: Option[U], authenticator: Option[Authenticator[U]], request: Request[A]) extends WrappedRequest(request)
+  case class RequestWithUser[A, U](user: Option[U], authenticator: Option[Authenticator[U]], request: Request[A], requestInfo: RouterInfo) extends WrappedRequest(request)
 
   /**
    * Saves the referer as original url in the session if it's not yet set.
@@ -214,7 +218,9 @@ object SecureSocial {
    * @return a future with an option user
    */
   def currentUser(implicit request: RequestHeader, env: RuntimeEnvironment, executionContext: ExecutionContext): Future[Option[env.U]] = {
-    env.authenticatorService.fromRequest.map {
+    import ExecutionContext.Implicits.global
+    implicit val requestInfo = env.authRouter.getAll(request)
+    env.authenticatorService.fromRequest(request, requestInfo).map {
       case Some(authenticator) if authenticator.isValid => Some(authenticator.user)
       case _ => None
     }

@@ -118,7 +118,7 @@ trait StoreBackedAuthenticator[U, T <: Authenticator[U]] extends Authenticator[U
    * @param result
    * @return
    */
-  override def touching(result: Result): Future[Result] = {
+  override def touching(result: Result)(implicit requestInfo: RouterInfo): Future[Result] = {
     Future.successful(result)
   }
 
@@ -139,7 +139,7 @@ trait StoreBackedAuthenticator[U, T <: Authenticator[U]] extends Authenticator[U
    * @param result the result that is about to be sent to the client.
    * @return the result modified to signal the authenticator is no longer valid
    */
-  override def discarding(result: Result): Future[Result] = {
+  override def discarding(result: Result)(implicit requestInfo: RouterInfo): Future[Result] = {
     store.delete(id).map { _ => result }
   }
 
